@@ -7,6 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from torchvision import transforms
 import torch.optim as optim
+import tqdm
 
 class MNISTDataset(Dataset):
     def __init__(self, location, class1, class2):
@@ -30,15 +31,18 @@ class DigitClassificationModel(nn.Module):
     def __init__(self):
         super(DigitClassificationModel, self).__init__()
         self.conv2d = nn.Conv2d(1, 1, (2,2), padding="same")
-        self.flatten = nn.Flatten(1,2)
-        self.relu = nn.ReLU()
+        self.flatten = nn.Flatten(2,3)
+        self.tanh = nn.Tanh()
         self.linear = nn.Linear(784, 1)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, item):
+        #print(f"initial size {item.size()}")
         output = self.conv2d(item)
+        #print(f"conv2d size {output.size()}")
         output = self.flatten(output)
-        output = self.relu(output)
+        #print(f"flatten size {output.size()}")
+        output = self.tanh(output)
         output = self.linear(output)
         output = self.sigmoid(output)
 
@@ -47,9 +51,23 @@ class DigitClassificationModel(nn.Module):
 def train(dataset, batch_size=25, epochs=3):
     dataloader = DataLoader(dataset, batch_size, shuffle=True, pin_memory=True)
     model = DigitClassificationModel()
-    optimizer = optim.Adam
-    for epoch in epochs:
-        for batch_index, sample in enumerate(dataloader):
+    optimizer = optim.Adam(model.parameters())
+    criterion = nn.BCELoss()
+    for epoch in range(epochs):
+        total_loss = 0
+        for batch_index, sample in enumerate(tqdm.tqdm(dataloader)):
+            optimizer.zero_grad()
             X, y = sample
             output = model(X)
+            #print(f"dtypes y {y.dtype} output {output.dtype}")
+            #print(f"y size {y.size()} output size {output.size()}")
+            #print(f"output {output}")
+            loss = criterion(torch.squeeze(output), y.float())
+            loss.backward()
+            total_loss += float(loss)
+            optimizer.step()
+        print(f"Total loss = {total_loss}")
+
+    return model
+            
             
