@@ -8,6 +8,7 @@ from PIL import Image
 from torchvision import transforms
 import torch.optim as optim
 import tqdm
+from torch.nn.functional import one_hot
 
 class MNISTDataset(Dataset):
     def __init__(self, location, classes, device=None):
@@ -87,7 +88,9 @@ class DigitGenerationModel(nn.Module):
     def forward(self, item):
         output = self.linear(item)
         output = self.tanh(output)
-        output = self.unflatten(output)
+        #print(f"after linear {output.size()}")
+        output = self.unflatten(output).unsqueeze(1)
+        #print(f"after unflatten {output.size()}")
         output = self.conv2d(output)
         output = self.sigmoid(output)
         return output
@@ -116,7 +119,7 @@ def train(dataset, classes, batch_size=25, epochs=3, device='cpu'):
     return model
             
             
-def train(dataset, classes, batch_size=25, epochs=3, device='cpu'):
+def train_generate(dataset, classes, batch_size=25, epochs=3, device='cpu'):
     dataloader = DataLoader(dataset, batch_size, shuffle=True)
     model = DigitGenerationModel(classes, device=device)
     optimizer = optim.Adam(model.parameters())
@@ -126,13 +129,13 @@ def train(dataset, classes, batch_size=25, epochs=3, device='cpu'):
         for batch_index, sample in enumerate(tqdm.tqdm(dataloader)):
             optimizer.zero_grad()
             X, y = sample
-            y = y.to(device)
-
-            output = model(X)
+            y = one_hot(y.to(device), 10).float()
+            
+            output = model(y)
             #print(f"dtypes y {y.dtype} output {output.dtype}")
             #print(f"y size {y.size()} output size {output.size()}")
             #print(f"output {output} y {y}")
-            loss = criterion(torch.squeeze(output), y)
+            loss = criterion(output, X)
             loss.backward()
             total_loss += float(loss)
             optimizer.step()
